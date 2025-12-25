@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>A Christmas Surprise!</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <style>
+        body { background: #fdfdfd; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 20px; }
+        h1 { color: #d42426; margin-bottom: 5px; }
+        .message { color: #165b33; font-weight: bold; margin-bottom: 20px; }
+        
+        #scratch-container {
+            position: relative;
+            max-width: 400px;
+            aspect-ratio: 1 / 1; /* Make sure this matches your image shapes */
+            margin: 0 auto;
+            border: 8px solid #d42426;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+            background: #eee;
+        }
+
+        /* The Teaser/Preview Image revealed by scratching */
+        #preview-image {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+
+        /* The Scratchable Festive Cover */
+        #scratch-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            z-index: 2;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        .claim-btn {
+            display: none; /* Only appears when scratched enough */
+            margin-top: 25px;
+            padding: 15px 40px;
+            background: #165b33; /* Festive Green */
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 15px rgba(22, 91, 51, 0.4);
+            border: 2px solid #0d4024;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Merry Christmas! 🎅</h1>
+    <p class="message">Scratch the festive wrap to see your gift!</p>
+
+    <div id="scratch-container">
+        <!-- REVEALED PREVIEW IMAGE -->
+        <img id="preview-image" src="{{ url_for('static', filename='preview_card.png') }}">
+        
+        <!-- FESTIVE COVER CANVAS -->
+        <canvas id="scratch-canvas"></canvas>
+    </div>
+
+    <!-- LINK TO THE FULL (DIFFERENT) GIFT CARD -->
+    <a href="{{ url_for('static', filename='full_card.png') }}" target="_blank" class="claim-btn" id="claim-btn">
+        View Full Gift Card ✨
+    </a>
+
+    <script>
+        const canvas = document.getElementById('scratch-canvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('scratch-container');
+        const btn = document.getElementById('claim-btn');
+        const coverImg = new Image();
+        
+        coverImg.src = "{{ url_for('static', filename='cover.png') }}";
+        
+        coverImg.onload = () => {
+            canvas.width = container.offsetWidth;
+            canvas.height = container.offsetHeight;
+            ctx.drawImage(coverImg, 0, 0, canvas.width, canvas.height);
+        };
+
+        let isDrawing = false;
+
+        function scratch(e) {
+            if (!isDrawing) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            // Supports both mouse and touch
+            const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+            const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+            
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            ctx.arc(x, y, 35, 0, Math.PI * 2);
+            ctx.fill();
+            
+            checkScratch();
+        }
+
+        function checkScratch() {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            let transparentPixels = 0;
+            // Loop through alpha channel
+            for (let i = 3; i < imageData.data.length; i += 4) {
+                if (imageData.data[i] === 0) transparentPixels++;
+            }
+            
+            // If 40% is cleared, show the button for the FULL image
+            if (transparentPixels > (imageData.data.length / 4) * 0.40) {
+                btn.style.display = 'inline-block';
+            }
+        }
+
+        canvas.addEventListener('mousedown', () => isDrawing = true);
+        window.addEventListener('mouseup', () => isDrawing = false);
+        canvas.addEventListener('mousemove', scratch);
+        
+        canvas.addEventListener('touchstart', (e) => { isDrawing = true; scratch(e); });
+        canvas.addEventListener('touchend', () => isDrawing = false);
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); scratch(e); }, { passive: false });
+    </script>
+</body>
+</html>
