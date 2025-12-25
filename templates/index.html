@@ -1,133 +1,217 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>A Christmas Surprise!</title>
+    <meta charset="UTF-8">
+    <title>A Christmas Surprise! 🎅</title>
+    <!-- Ensures it looks good and works on mobile phones -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    
     <style>
-        body { background: #fdfdfd; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 20px; }
-        h1 { color: #d42426; margin-bottom: 5px; }
-        .message { color: #165b33; font-weight: bold; margin-bottom: 20px; }
+        body { 
+            background: #fdfdfd; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; 
+            margin: 0; 
+            padding: 20px; 
+            color: #333;
+        }
+
+        h1 { 
+            color: #d42426; /* Christmas Red */
+            margin-bottom: 5px; 
+            font-size: 2rem;
+        }
+
+        .message { 
+            color: #165b33; /* Christmas Green */
+            font-weight: bold; 
+            margin-bottom: 20px; 
+            font-size: 1.1rem;
+        }
         
+        /* The main container holding the images and canvas */
         #scratch-container {
             position: relative;
-            max-width: 400px;
-            aspect-ratio: 1 / 1; /* Make sure this matches your image shapes */
+            max-width: 400px; /* Limits size on desktop */
+            width: 100%;
+            aspect-ratio: 1 / 1; /* Keeps it square. Change to 16/9 if your images are rectangles */
             margin: 0 auto;
             border: 8px solid #d42426;
             border-radius: 15px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             overflow: hidden;
             background: #eee;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
-        /* The Teaser/Preview Image revealed by scratching */
+        /* Layer 1: The Teaser/Preview Image (Revealed as you scratch) */
         #preview-image {
             position: absolute;
             top: 0; left: 0;
-            width: 100%; height: 100%;
+            width: 100%; 
+            height: 100%;
             object-fit: cover;
             z-index: 1;
         }
 
-        /* The Scratchable Festive Cover */
+        /* Layer 2: The Interactive Surface (The Festive Wrap) */
         #scratch-canvas {
             position: absolute;
             top: 0; left: 0;
             z-index: 2;
             cursor: crosshair;
-            touch-action: none;
+            touch-action: none; /* Prevents scrolling while scratching on mobile */
         }
 
+        /* The Final Reveal Button */
         .claim-btn {
-            display: none; /* Only appears when scratched enough */
+            display: none; /* Hidden until 40% is scratched */
             margin-top: 25px;
             padding: 15px 40px;
             background: #165b33; /* Festive Green */
-            color: white;
+            color: white !important;
             text-decoration: none;
             border-radius: 50px;
             font-weight: bold;
             font-size: 1.2rem;
             box-shadow: 0 4px 15px rgba(22, 91, 51, 0.4);
             border: 2px solid #0d4024;
+            transition: transform 0.2s;
+            display: none; /* Controlled by JS */
+        }
+
+        .claim-btn:active {
+            transform: scale(0.95);
+        }
+
+        #btn-wrapper {
+            height: 80px; /* Prevents page jump when button appears */
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
 
-    <h1>Merry Christmas! 🎅</h1>
-    <p class="message">Scratch the festive wrap to see your gift!</p>
+    <h1>Merry Christmas! 🎄</h1>
+    <p class="message">Scratch the festive wrap to reveal your gift!</p>
 
     <div id="scratch-container">
-        <!-- REVEALED PREVIEW IMAGE -->
-        <img id="preview-image" src="{{ url_for('static', filename='preview_card.png') }}">
+        <!-- THE PREVIEW IMAGE (revealed by scratching) -->
+        <img id="preview-image" src="{{ url_for('static', filename='preview_card.png') }}" alt="Preview">
         
-        <!-- FESTIVE COVER CANVAS -->
-        <canvas id="scratch-canvas" src="{{ url_for('static', filename='cover.jpg') }}"></canvas>
+        <!-- THE COVER CANVAS (the festive surface) -->
+        <canvas id="scratch-canvas"></canvas>
     </div>
 
-    <!-- LINK TO THE FULL (DIFFERENT) GIFT CARD -->
-    <a href="{{ url_for('static', filename='full_card.png') }}" target="_blank" class="claim-btn" id="claim-btn">
-        View Full Gift Card ✨
-    </a>
+    <div id="btn-wrapper">
+        <!-- THE LINK TO THE FULL (FINAL) GIFT CARD -->
+        <a href="{{ url_for('static', filename='full_card.png') }}" target="_blank" class="claim-btn" id="claim-btn">
+            View Full Gift Card ✨
+        </a>
+    </div>
 
     <script>
         const canvas = document.getElementById('scratch-canvas');
         const ctx = canvas.getContext('2d');
         const container = document.getElementById('scratch-container');
         const btn = document.getElementById('claim-btn');
+        
         const coverImg = new Image();
-        
-        coverImg.src = "{{ url_for('static', filename='cover.png') }}";
-        
-        coverImg.onload = () => {
-            canvas.width = container.offsetWidth;
-            canvas.height = container.offsetHeight;
-            ctx.drawImage(coverImg, 0, 0, canvas.width, canvas.height);
+
+        // 1. IMPROVED LOADING LOGIC
+        coverImg.onload = function() {
+            initCanvas(false);
         };
 
+        coverImg.onerror = function() {
+            console.error("Cover image failed to load. Using fallback.");
+            initCanvas(true);
+        };
+
+        // Set source AFTER setting onload/onerror
+        coverImg.src = "{{ url_for('static', filename='cover.jpg') }}";
+
+        function initCanvas(useFallback) {
+            // Set canvas size to match the container's real-time size
+            canvas.width = container.offsetWidth;
+            canvas.height = container.offsetHeight;
+
+            if (useFallback) {
+                // Draw a festive red fallback if image is missing
+                ctx.fillStyle = '#d42426';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "white";
+                ctx.font = "bold 24px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText("SCRATCH HERE!", canvas.width/2, canvas.height/2);
+            } else {
+                ctx.drawImage(coverImg, 0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        // 2. SCRATCHING LOGIC
         let isDrawing = false;
 
         function scratch(e) {
             if (!isDrawing) return;
             
             const rect = canvas.getBoundingClientRect();
-            // Supports both mouse and touch
-            const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
-            const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+            // Handle both Mouse and Touch coordinates
+            const clientX = (e.clientX || (e.touches ? e.touches[0].clientX : 0));
+            const clientY = (e.clientY || (e.touches ? e.touches[0].clientY : 0));
             
             const x = clientX - rect.left;
             const y = clientY - rect.top;
 
+            // 'destination-out' turns the drawing into an eraser
             ctx.globalCompositeOperation = 'destination-out';
             ctx.beginPath();
             ctx.arc(x, y, 35, 0, Math.PI * 2);
             ctx.fill();
             
-            checkScratch();
+            checkScratchPercentage();
         }
 
-        function checkScratch() {
+        function checkScratchPercentage() {
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             let transparentPixels = 0;
-            // Loop through alpha channel
+            
+            // Check every 4th value (the Alpha/Transparency channel)
             for (let i = 3; i < imageData.data.length; i += 4) {
                 if (imageData.data[i] === 0) transparentPixels++;
             }
             
-            // If 40% is cleared, show the button for the FULL image
-            if (transparentPixels > (imageData.data.length / 4) * 0.40) {
+            // If more than 40% is cleared, show the button
+            const percentage = transparentPixels / (imageData.data.length / 4);
+            if (percentage > 0.40) {
                 btn.style.display = 'inline-block';
             }
         }
 
+        // 3. EVENT LISTENERS
+        // Mouse Events
         canvas.addEventListener('mousedown', () => isDrawing = true);
         window.addEventListener('mouseup', () => isDrawing = false);
         canvas.addEventListener('mousemove', scratch);
         
-        canvas.addEventListener('touchstart', (e) => { isDrawing = true; scratch(e); });
+        // Touch Events (Mobile)
+        canvas.addEventListener('touchstart', (e) => { 
+            isDrawing = true; 
+            scratch(e); 
+        });
         canvas.addEventListener('touchend', () => isDrawing = false);
-        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); scratch(e); }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => { 
+            e.preventDefault(); // Prevents page from scrolling while scratching
+            scratch(e); 
+        }, { passive: false });
+
+        // Handle window resizing (Optional but helpful)
+        window.addEventListener('resize', () => {
+            // Note: resizing the window will reset the canvas. 
+            // Usually fine for mobile orientation changes.
+            if (!isDrawing) initCanvas(!coverImg.complete);
+        });
     </script>
 </body>
 </html>
